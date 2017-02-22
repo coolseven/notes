@@ -806,6 +806,7 @@ public function failed($jobData){
 各个类之间的关系图如下：
 
 ![thinkphp-queue类关系图](thinkphp-queue类关系图.svg)
+![thinkphp-queue类关系图](https://github.com/coolseven/notes/blob/master/thinkphp-queue/thinkphp-queue类关系图.svg)
 
 #### 3.3 Deamon模式的执行流程
 
