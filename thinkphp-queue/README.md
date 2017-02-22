@@ -805,20 +805,17 @@ public function failed($jobData){
 
 各个类之间的关系图如下：
 
-![thinkphp-queue类关系图](thinkphp-queue类关系图.svg)
-![thinkphp-queue类关系图](https://github.com/coolseven/notes/blob/master/thinkphp-queue/thinkphp-queue类关系图.svg)
+![thinkphp-queue类关系图](https://blog.huzhongyuan.com/wp-content/uploads/2017/02/thinkphp-queue%E7%B1%BB%E5%85%B3%E7%B3%BB%E5%9B%BE.svg)
 
 #### 3.3 Deamon模式的执行流程
 
-![Daemon模式与非daemon模式状态图](Daemon模式与非daemon模式状态图.svg)
 ![Daemon模式与非daemon模式状态图](https://blog.huzhongyuan.com/wp-content/uploads/2017/02/Daemon%E6%A8%A1%E5%BC%8F%E4%B8%8E%E9%9D%9Edaemon%E6%A8%A1%E5%BC%8F%E7%8A%B6%E6%80%81%E5%9B%BE.svg)
-<img src="https://blog.huzhongyuan.com/wp-content/uploads/2017/02/Daemon%E6%A8%A1%E5%BC%8F%E4%B8%8E%E9%9D%9Edaemon%E6%A8%A1%E5%BC%8F%E7%8A%B6%E6%80%81%E5%9B%BE.svg">
 
 #### 3.4 消息处理的详细流程 
 
 下图中，展示了database 模式下一个消息处理的详细流程，redis 驱动下大体类似
 
-![消息获取和执行的具体流程](消息获取和执行的具体流程.svg)
+![Database模式下消息获取和执行的具体流程](https://blog.huzhongyuan.com/wp-content/uploads/2017/02/%E6%B6%88%E6%81%AF%E8%8E%B7%E5%8F%96%E5%92%8C%E6%89%A7%E8%A1%8C%E7%9A%84%E5%85%B7%E4%BD%93%E6%B5%81%E7%A8%8B.svg)
 
 #### 3.5 thinkphp-queue的性能
 
