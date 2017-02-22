@@ -392,7 +392,7 @@ php think queue:work --queue helloJobQueue
   - 任务数量较多
   - 性能要求较高
   - 任务的执行时间较短
-  - **消费者类中不存在死循环，或者 sleep() 等容易导致bug的逻辑**
+  - 消费者类中不存在死循环，sleep() ，exit() ,die() 等容易导致bug的逻辑
 
   listen命令的适用场景是：
 
@@ -697,10 +697,9 @@ class MyQueueFailedLogger {
         ];
         var_export(json_encode($failedJobLog,true));
         
-		  // $jobObject->release();     //重发任务
-
-          $jobObject->delete();         //删除任务
-          $jobObject->failed();		    //通知消费者类任务执行失败
+           // $jobObject->release();     //重发任务
+          //$jobObject->delete();         //删除任务
+          //$jobObject->failed();	  //通知消费者类任务执行失败
         
         return self::should_run_hook_callback;         
     }
@@ -724,7 +723,8 @@ class MyQueueFailedLogger {
  * @param $jobData  string|array|...      //发布任务时传递的 jobData 数据
  */
 public function failed($jobData){
-    // send_mail_to_somebody() ; 
+    send_mail_to_somebody() ; 
+    
     print("Warning: Job failed after max retries. job data is :".var_export($data,true)."\n"; 
 }
 ```
@@ -763,12 +763,12 @@ public function failed($jobData){
   ```php
   [
     'job'  => 'application\\index\\job\\Hello' ,  // jobHandlerClassName，消费者类的类名 
-    'data' => [									// 生产者传入的业务数据
+    'data' => [					  // 生产者传入的业务数据
        'time' => '2017-02-18 16:20:10',
        'data' => 'I have 648 apples'
     ],
-    'id'   => '77IasdasadIasdadadadKL8t',			// 一个随机的32位字符串
-    'attempts' => 2								// 任务的已尝试次数
+    'id'   => '77IasdasadIasdadadadKL8t',	// 一个随机的32位字符串
+    'attempts' => 2				// 任务的已尝试次数
   ]
   ```
 
@@ -863,7 +863,7 @@ public function failed($jobData){
 
 -   **3.6.2** 使用了 `queue:work --daemon` ，但更新代码后没有使用 `queue:restart` 重启 work 进程, 使得 work  进程中的代码与最新的代码不同，出现各种问题。
 
--   **3.6.3** 使用了 `queue:work --daemon` ，但是消费者类的 fire() 方法中存在死循环，或者 `sleep(n)` 这样的逻辑，导致消息队列被堵塞。
+-   **3.6.3** 使用了 `queue:work --daemon` ，但是消费者类的 fire() 方法中存在死循环，或 `sleep(n)` 等逻辑，导致消息队列被堵塞；或者使用了 `exit()` , `die()` 这样的逻辑，导致work进程直接终止 。
 
 -   **3.6.4** 配置的 expire 为 `null` ，这时如果采用的是 Redis 驱动且使用了延迟功能，如 `later(n)`  ， `release(n)` 方法或者 `--delay` 参数不为0 ， 那么将导致被延迟的任务永远无法处理。(这个可能属于框架的[Bug](https://github.com/top-think/think-queue/issues/12))
 
@@ -873,7 +873,7 @@ public function failed($jobData){
 
 -   **3.6.7** 使用 `Queue::push($jobHandlerClassName , $jobData, $jobQueueName );` 推送任务时，`$jobData` 中包含未序列化的对象。这时，在消费者端拿到的 `$jobData ` 中拿到的是该对象的public 属性的键值对数组。因此，需要在推送前手动序列化对象，在消费者端再手动反序列化还原为对象。
 
-        ​
+    
 
 ### 四 拓展
 
