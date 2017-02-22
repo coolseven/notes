@@ -812,6 +812,7 @@ public function failed($jobData){
 
 ![Daemon模式与非daemon模式状态图](Daemon模式与非daemon模式状态图.svg)
 ![Daemon模式与非daemon模式状态图](https://blog.huzhongyuan.com/wp-content/uploads/2017/02/Daemon%E6%A8%A1%E5%BC%8F%E4%B8%8E%E9%9D%9Edaemon%E6%A8%A1%E5%BC%8F%E7%8A%B6%E6%80%81%E5%9B%BE.svg)
+<img src="https://blog.huzhongyuan.com/wp-content/uploads/2017/02/Daemon%E6%A8%A1%E5%BC%8F%E4%B8%8E%E9%9D%9Edaemon%E6%A8%A1%E5%BC%8F%E7%8A%B6%E6%80%81%E5%9B%BE.svg">
 
 #### 3.4 消息处理的详细流程 
 
