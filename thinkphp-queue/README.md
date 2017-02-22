@@ -813,9 +813,9 @@ public function failed($jobData){
 
 #### 3.4 消息处理的详细流程 
 
-下图中，展示了database 模式下一个消息处理的详细流程，redis 驱动下大体类似
+下图中，展示了database 模式下消息处理的详细流程，redis 驱动下大体类似
 
-![Database模式下消息获取和执行的具体流程](https://blog.huzhongyuan.com/wp-content/uploads/2017/02/%E6%B6%88%E6%81%AF%E8%8E%B7%E5%8F%96%E5%92%8C%E6%89%A7%E8%A1%8C%E7%9A%84%E5%85%B7%E4%BD%93%E6%B5%81%E7%A8%8B.svg)
+![Database模式下消息获取和执行的具体流程](https://blog.huzhongyuan.com/wp-content/uploads/2017/02/Database%E9%A9%B1%E5%8A%A8%E4%B8%8B%E6%B6%88%E6%81%AF%E5%A4%84%E7%90%86%E7%9A%84%E5%85%B7%E4%BD%93%E6%B5%81%E7%A8%8B.svg)
 
 #### 3.5 thinkphp-queue的性能
 
