@@ -771,6 +771,7 @@ public function failed($jobData){
     'attempts' => 2				// 任务的已尝试次数
   ]
   ```
+  redis驱动下，为了实现任务的延迟执行和过期重发，任务将在这三个key中来回转移，详情可见 3.5
 
 - Database
 
@@ -811,13 +812,33 @@ public function failed($jobData){
 
 ![Daemon模式与非daemon模式状态图](https://blog.huzhongyuan.com/wp-content/uploads/2017/02/Daemon%E6%A8%A1%E5%BC%8F%E4%B8%8E%E9%9D%9Edaemon%E6%A8%A1%E5%BC%8F%E7%8A%B6%E6%80%81%E5%9B%BE.svg)
 
-#### 3.4 消息处理的详细流程 
+#### 3.4 Database模式下消息处理的详细流程 
 
 下图中，展示了database 模式下消息处理的详细流程，redis 驱动下大体类似
 
 ![Database模式下消息获取和执行的具体流程](https://blog.huzhongyuan.com/wp-content/uploads/2017/02/Database%E9%A9%B1%E5%8A%A8%E4%B8%8B%E6%B6%88%E6%81%AF%E5%A4%84%E7%90%86%E7%9A%84%E5%85%B7%E4%BD%93%E6%B5%81%E7%A8%8B.svg)
 
-#### 3.5 thinkphp-queue的性能
+#### 3.5 redis 驱动下的任务重发细节
+
+在redis驱动下，为了实现任务的延迟执行和过期重发，任务将在这三个key中来回转移。
+
+在3.4 Database模式下消息处理的消息流程中，我们知道，如果配置的expire 不是null ，那么 thinkphp-queue的work进程每次在获取下一个可执行任务之前，会先尝试重发所有过期的任务。而在redis驱动下，这个步骤则做了更多的事情，详情如下：
+
+1. 从 `queue:xxx:delayed` 的key中查询出有哪些任务在当前时刻已经可以开始执行，然后将这些任务转移到 `queue:xxx` 的key的尾部。
+2. 从 `queue:xxx:reserved` 的key中查询出有哪些任务在当前时刻已经过期，然后将这些任务转移到 `queue:xxx`的key的尾部。
+3. 尝试从 `queue:xxx` 的key的头部取出一个任务，如果取出成功，那么，将这个任务转移到 `queue:xxx:reserved` 的key 的头部，同时将这个任务实例化成任务对象，交给消费者去执行。
+
+用图来表示这个步骤的具体过程如下：
+
+redis队列中的过期任务重发步骤--执行前：
+
+![redis队列中的过期任务重发步骤-执行前](https://blog.huzhongyuan.com/wp-content/uploads/2017/02/redis%E9%98%9F%E5%88%97%E4%B8%AD%E7%9A%84%E4%BB%BB%E5%8A%A1%E7%AE%A1%E7%90%86-1.png)
+
+redis队列中的过期任务重发步骤--执行后：
+
+![redis队列中的过期任务重发步骤--执行后](https://blog.huzhongyuan.com/wp-content/uploads/2017/02/redis%E9%98%9F%E5%88%97%E4%B8%AD%E7%9A%84%E4%BB%BB%E5%8A%A1%E7%AE%A1%E7%90%86-2.png)
+
+#### 3.6 thinkphp-queue的性能
 
 - 测试环境 :
 
@@ -836,9 +857,9 @@ public function failed($jobData){
 
 **注意：**由于在测试时，Host 机本身的cpu和内存长期100%，并且虚拟机中的各项服务并未专门调优，因此该测试结果**并不具备参考性**。
 
-#### 3.6 thinkphp-queue 的N种错误使用姿势
+#### 3.7 thinkphp-queue 的N种错误使用姿势
 
--   **3.6.1** 在 消费者类的 `fire()` 方法中，忘记使用 `$job->delete()` 去删除消息，这种情况下，会产生一系列的bug：
+-   **3.7.1** 在 消费者类的 `fire()` 方法中，忘记使用 `$job->delete()` 去删除消息，这种情况下，会产生一系列的bug：
 
     - 配置的 expire 为 `null` ， 则该任务被执行一次后会永远留在消息队列中，占用消息队列的空间 , 除非开发者另行处理。
 
@@ -861,17 +882,17 @@ public function failed($jobData){
     - 编写失败回调事件，将事件中失败的任务及时通知给开发人员。
 
 
--   **3.6.2** 使用了 `queue:work --daemon` ，但更新代码后没有使用 `queue:restart` 重启 work 进程, 使得 work  进程中的代码与最新的代码不同，出现各种问题。
+-   **3.7.2** 使用了 `queue:work --daemon` ，但更新代码后没有使用 `queue:restart` 重启 work 进程, 使得 work  进程中的代码与最新的代码不同，出现各种问题。
 
--   **3.6.3** 使用了 `queue:work --daemon` ，但是消费者类的 fire() 方法中存在死循环，或 `sleep(n)` 等逻辑，导致消息队列被堵塞；或者使用了 `exit()` , `die()` 这样的逻辑，导致work进程直接终止 。
+-   **3.7.3** 使用了 `queue:work --daemon` ，但是消费者类的 fire() 方法中存在死循环，或 `sleep(n)` 等逻辑，导致消息队列被堵塞；或者使用了 `exit()` , `die()` 这样的逻辑，导致work进程直接终止 。
 
--   **3.6.4** 配置的 expire 为 `null` ，这时如果采用的是 Redis 驱动且使用了延迟功能，如 `later(n)`  ， `release(n)` 方法或者 `--delay` 参数不为0 ， 那么将导致被延迟的任务永远无法处理。(这个可能属于框架的[Bug](https://github.com/top-think/think-queue/issues/12))
+-   **3.7.4** 配置的 expire 为 `null` ，这时如果采用的是 Redis 驱动且使用了延迟功能，如 `later(n)`  ， `release(n)` 方法或者 `--delay` 参数不为0 ， 那么将导致被延迟的任务永远无法处理。(这个可能属于框架的[Bug](https://github.com/top-think/think-queue/issues/12))
 
--   **3.6.5** 配置的 expire 为`null` ，但并没有自行处理过期的任务，导致过期的任务得不到处理，且一直占用消息队列的空间。
+-   **3.7.5** 配置的 expire 为`null` ，但并没有自行处理过期的任务，导致过期的任务得不到处理，且一直占用消息队列的空间。
 
--   **3.6.6** 配置的 expire `不为null` ，但配置的 expire 时间太短，以至于  expire 时间 < 消费者的 `fire()` 方法所需时间 +  删除该任务所需的时间 ，那么任务将被误认为执行超时，从而被消息队列还原为待执行状态。
+-   **3.7.6** 配置的 expire `不为null` ，但配置的 expire 时间太短，以至于  expire 时间 < 消费者的 `fire()` 方法所需时间 +  删除该任务所需的时间 ，那么任务将被误认为执行超时，从而被消息队列还原为待执行状态。
 
--   **3.6.7** 使用 `Queue::push($jobHandlerClassName , $jobData, $jobQueueName );` 推送任务时，`$jobData` 中包含未序列化的对象。这时，在消费者端拿到的 `$jobData ` 中拿到的是该对象的public 属性的键值对数组。因此，需要在推送前手动序列化对象，在消费者端再手动反序列化还原为对象。
+-   **3.7.7** 使用 `Queue::push($jobHandlerClassName , $jobData, $jobQueueName );` 推送任务时，`$jobData` 中包含未序列化的对象。这时，在消费者端拿到的 `$jobData ` 中拿到的是该对象的public 属性的键值对数组。因此，需要在推送前手动序列化对象，在消费者端再手动反序列化还原为对象。
 
 
 ### 四 拓展
@@ -898,22 +919,22 @@ public function failed($jobData){
 
 TP5的消息队列与Laravel的消息队列比较相似，下面是与laravel 中的消息队列的一些对比：
 
-|           | TP5                                | LARAVEL                                 |
-| --------- | ---------------------------------- | --------------------------------------- |
-| 内置的驱动     | Database，Redis，Sync，TopThink       | Database，Redis, Sync(在laravel中称为 null)。 |
-| Redis驱动要求 | 安装redis的C扩展                        | 安装 predis 包                             |
-| 推送任务      | 允许推送 消费者类名，消费者对象                   | 允许推送消费者类名，消费者对象，闭包                      |
-| 失败任务处理    | 触发失败回调事件 (有Bug)                    | 触发失败回调事件 + 移动任务到 failed_jobs表?          |
-| 消息订阅      | subscribe 命令(未实现/未提供) + Topthink驱动 | subscribe 命令 + IronMQ 驱动                |
-| 删除任务      | 消费者类中手动删除                          | 任务完成后自动删除                               |
-| 推送到多个队列   | 需自己实现                              | 原生支持                                    |
-| 延迟执行      | 支持 (有Bug)                          | 支持                                      |
-| 消息重发      | 支持                                 | 支持                                      |
-| 检查已执行次数   | 原生支持                               | 需在消费者类中显式 use 相关的 trait                 |
-| 执行方式      | work 模式 + listen 模式                | work 模式 + listen 模式                     |
-| 进程命令      | 开启，停止，重启                           | 开启，停止，重启                                |
-| 任务命令      | 无                                  | 展示失败任务列表，重试某个失败任务，删除某个失败任务              |
-| 支持的事件     | 失败回调事件                             | 失败回调事件，支持消费前事件，消费后事件                    |
+|           | thinkphp-queue (v1.1.2)             | laravel-queue (v5.3)                    |
+| --------- | ----------------------------------- | --------------------------------------- |
+| 内置的驱动     | Database，Redis，Sync，TopThink        | Database，Redis, Sync(在laravel中称为 null)。 |
+| Redis驱动要求 | 安装redis的C扩展                         | 安装 predis 包 + LUA脚本                     |
+| 推送任务      | 允许推送 消费者类名，消费者对象                    | 允许推送消费者类名，消费者对象，闭包                      |
+| 失败任务处理    | 触发失败回调事件 (有Bug)                     | 触发失败回调事件 + 移动任务到 failed_jobs表?          |
+| 消息订阅      | subscribe 命令+ Topthink驱动(注：未实现/未提供) | subscribe 命令 + 安装IronMQ 驱动              |
+| 删除任务      | 消费者类中手动删除                           | 任务完成后自动删除                               |
+| 推送到多个队列   | 需自己实现                               | 原生支持                                    |
+| 延迟执行      | 支持 (有Bug)                           | 支持                                      |
+| 消息重发      | 支持                                  | 支持                                      |
+| 检查已执行次数   | 原生支持                                | 需在消费者类中显式 use 相关的 trait                 |
+| 执行方式      | work 模式 + listen 模式                 | work 模式 + listen 模式                     |
+| 进程命令      | 开启，停止，重启                            | 开启，停止，重启                                |
+| 任务命令      | 无                                   | 展示失败任务列表，重试某个失败任务，删除某个失败任务              |
+| 支持的事件     | 失败回调事件                              | 失败回调事件，支持消费前事件，消费后事件                    |
 
 ### 五 待讨论的问题
 
