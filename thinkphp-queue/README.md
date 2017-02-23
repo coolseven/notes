@@ -166,7 +166,7 @@ namespace application\index\controller;
       if( $isPushed !== false ){  
           echo date('Y-m-d H:i:s') . " a new Hello Job is Pushed to the MQ"."<br>";
       }else{
-          echo 'Oops, something wrong happened.';
+          echo 'Oops, something went wrong.';
       }
   }
  }
