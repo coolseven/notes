@@ -228,8 +228,10 @@ namespace application\index\controller;
       
       /**
        * 有些消息在到达消费者时,可能已经不再需要执行了
+       * @param array|mixed    $data     发布任务时自定义的数据
+       * @return boolean                 任务执行的结果
        */
-      public function checkDatabaseToSeeIfJobNeedToBeDone($data){
+      private function checkDatabaseToSeeIfJobNeedToBeDone($data){
           return true;
       }
 
