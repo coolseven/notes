@@ -95,7 +95,7 @@
 
 在上面 1.4 中，我们看到，解决 session blocking problem 的其中一个办法就是不再依赖php的session wrapper，而是独立实现一套session管理机制。laravel 也是选择的的这一种方式。
 
-Facade\Session::start() 
+注: laravel 的 session 管理组件并不依赖 php 的 session 模块,这意味着即使你在编译 php 时禁用了 session 模块(`./configure  --disable-session`),laravel 中涉及到 session 的部分也仍然可以正常运行.
 
 ### 2.1 laravel 支持的 session driver
 
@@ -121,7 +121,7 @@ Facade\Session::start()
 
 ### 2.2 laravel 的 FileSessionHandler 分析
 
-以 file 类型的 driver 为例，其对应的 session 处理类位于 `vendor\laravel\framework\src\Illuminate\Session\FileSessionHandler.php`,其代码如下：
+以 file 类型的 driver 为例，其对应的处理类位于 `vendor\laravel\framework\src\Illuminate\Session\FileSessionHandler.php`,其代码如下：
 
 ```php
 <?php
@@ -179,7 +179,7 @@ class FileSessionHandler implements SessionHandlerInterface
 
 另一个是 该类的open() 直接返回 true ， 因此读取session时不会加锁，可以并发读。
 
-第三个是 该类的 write() 并不存在版本检查(乐观锁)机制。
+第三个是 该类的 write() 并不存在锁机制。
 
 第二点和第三点结合起来看，完全避免了 session blocking problem 。
 
@@ -189,7 +189,7 @@ class FileSessionHandler implements SessionHandlerInterface
 
 相同点：
 
--   模式相同，都使用了中间变量： 打开存储器 -> 挂载到变量 -> 读写变量 -> 将变量持久化到存储器
+-   模式相同，都使用了内存变量： 打开存储器 -> 挂载到变量 -> 读写变量 -> 将变量持久化到存储器
 -   对于传统模式来说,该变量是 $_SESSION, 
 -   对于 laravel 来说,该变量是 Illuminicate\Session\Store 对象上的 attributes 属性
 
@@ -197,12 +197,9 @@ class FileSessionHandler implements SessionHandlerInterface
 
 -   传统方式只要读写 $_SESSION 变量即可，剩下的 session 过期判断，回收，读取，持久化，以及在响应的 Header 中设置相关的响应头等都是由 php 内置的 session 模块自动完成的
 -   在 larave 中,上述的每一步都是在框架层由 StartSession 中间件实现的。
--   传统方式，当你输出了 header ，或/及 body 之后，再尝试读写session 时，会产生一个 'headers alreay sent' 的 Warning
--   laravel 方式，由于 $_SESSION 变量并不存在,因此,当你输出了 Header ，或/及 body 之后，再尝试读写 session 时，并不会产生任何 Warning
-
 
 -   laravel 的打开存储器不加锁，
--   传统方式打开存储器时默认会加锁，并且是事务锁，其他进程不可读，更不可写
+-   传统方式打开存储器时默认会加锁，其他进程不可读，更不可写
 
 -   同一个请求中,传统方式下,在一对 `session_start()` -> `session_commit()`  之间,如果出现了重复的 `session_start()`，那么这些多余的 `session_start()` 并不会重新打开存储器,而是直接被忽略。
 -   同一个请求中,laravel 机制下,在一对 `Session::start()` -> `Session::save()` 之间,如果出现了重复的 `Session::start()` ，那么每次 `Session::start()` 时,内存中的 session 数据都会与存储器中的最新数据进行合并. 因此,laravel 中的  `Session::start()` 方法可以理解成 `Session::mergeAttributesWithLatestStore()`
