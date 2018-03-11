@@ -1,6 +1,6 @@
-# 为什么 laravel 的 session 机制更好
+# session in laravel vs session in other frameworks
 
-这篇笔记从session blocking 问题出发，进而分析和对比了 laravel 和其他框架的 session 处理机制的优缺点，并分析了如何设计一个良好的session ，从而提高系统的并发。
+这篇笔记从session blocking 问题出发，分析和对比了 laravel 和其他框架的 session 处理机制的优缺点，并分析了如何设计一个良好的 session ，从而提高系统的并发。
 
 ## 一. session blocking problem
 
@@ -14,41 +14,41 @@ https://demo.ma.ttias.be/demo-php-blocking-sessions/
 
 ### 1.2 如何重现这个问题
 
-1.  ajax 请求的后台接口是 php 
-2.  ajax 请求头部携带了SessionCookie
-3.  后台使用了 session 来辨别 ajax 请求所属的用户
-4.  后台配置的 `session.save_handler` 为 php 内置的 `file` 或 `memcache`
-5.  后台代码中直接或间接使用了 `session_start()` 方法来启动 session
+1.  php 编译时启用了 session 模块(默认启用), 
+2.  php 代码或框架代码中使用了 `session_start()` 方法来启动 session
+3.  后台使用了 session 来辨别每个请求所属的用户
+4.  同时触发多个 ajax 请求,每个请求头部都携带相同的 sessionId
+5.  后台配置的 `session.save_handler` 为 php 内置的 `file` 或 `memcache`
 
-备注：ThinkPHP 框架和 Symfony 框架都满足 第 5 点。
+备注：ThinkPHP 框架和 Symfony 框架都满足 第 2 点。
 
 ### 1.3 问题产生的原因
 
-这个问题产生的根本原因，是因为对于 php 内置的 `file` 或 `memcache` 类型的 sessionHandler  来说，`session_start()` 方法是 阻塞的。
+这个问题产生的根本原因，是因为对于 php 内置的 `file` 或 `memcache` 类型的 sessionHandler  来说，`session_start()` 方法默认是阻塞的。
 
-对于同一个 session_id 来说，前一个请求使用 `session_start()` 之后，会自动给这个 session_id 对应的资源加上读写锁。该锁直到 `session_write_close()` 或者脚本结束之后才会释放。
+对于同一个 session_id 来说，前一个请求使用 `session_start()` 之后，会自动给这个 session_id 对应的资源加上读写锁。该锁直到调用  `session_commit() ` 或者 `session_write_close()` 或者脚本结束之后才会释放。
 
 回顾一下 php内置的 sessionHandler 的处理机制：
 
 -   代码或框架调用 `session_start()`方法来启动 session
 
-    -   对应的 `sessionHandler  ` 使用 `open()` 方法打开对应的资源
+    -   对应的 `sessionHandler  ` 使用 `open()` 方法打开对应的存储器
     -   对应的 `sessionHandler  ` 使用 `read()` 方法获取到反序列化之后的 session数据
     -   对应的 `sessionHandler  ` 将获取到的 session 数据挂载到 `$_SESSSION` 全局变量上
 
--   代码或框架读取/更新  `$_SESSSION` 变量中的 session 数据
+-   代码或框架读取/更新  `$_SESSSION` 变量
 
--   代码或框架在最终阶段调用 `session_commit() `或者`session_write_close()` 来提交 `$_SESSSION`，或者在脚本结束时，由php 自动提交 `$_SESSSION`
+-   代码或框架调用 `session_commit() `或者`session_write_close()` 来提交 `$_SESSSION`，或者在脚本结束时，由php 自动提交 `$_SESSSION`
 
     -   对应的 `sessionHandler  ` 使用 `write()` 方法将`$_SESSSION` 全局变量上的数据写入到对应的资源中
 
 -   session 的自动回收此处不分析
 
-注意 `session_start()`的第一阶段，即对应的 `sessionHandler  ` 使用 `open()` 方法打开对应的资源时，如果 sessionHandler  类型为  `file` 或 `memcache` , 那么 `open()` 方法会**自动给打开的资源上锁(类似于悲观锁，锁住整个事务(当前的会话))**。
+注意 `session_start()`的第一阶段，即对应的 `sessionHandler  ` 使用 `open()` 方法打开对应的资源时，如果 sessionHandler  类型为  `file` 或 `memcache` , 那么 `open()` 方法会 **自动给打开的资源上锁**。
 
-因此，在某个请求[打开session之后，提交session之前]的这段时间里，如果有其它的请求执行到了  `session_start() ` ，这些请求都会进入阻塞状态，直到这个 session 资源上的锁被释放。
+因此，在某个请求[打开session之后，提交session之前]的这段时间里，如果有其它的相同 sessionId 的请求执行到了  `session_start() ` ，这些请求都会进入阻塞状态，直到这个 session 资源上的锁被释放。
 
-而当锁被释放之后，这些请求中只能有一个请求能占用session资源，于是剩余的请求又只能进入阻塞状态中了。
+而当锁被释放之后，这些请求中也只能有一个请求能抢到 session 资源，于是剩余的请求又只能进入阻塞状态中了。
 
 
 
@@ -60,7 +60,7 @@ https://demo.ma.ttias.be/demo-php-blocking-sessions/
 -   设置 session.save_handler 为 `redis` ,  因为 redis 的 session 操作不支持锁
 -   如果你的 session.save_handler 为 `memcached` ，那么将 `memcached.sess_locking = 'off'`
 -   通过 `ini.session_set_save_handler()` 来使用自定义的 sessionHandler ，在自定义的 sessionHandler 的 `open()` 方法中优化session的加锁逻辑
--   不再依赖于 php 的 session wrapper 去管理 session，而是独立实现一套 session 管理机制
+-   不再依赖于 php 的 session 模块 去管理 session，而是独立实现一套 session 管理机制
 
 
 
@@ -68,7 +68,7 @@ https://demo.ma.ttias.be/demo-php-blocking-sessions/
 
 你可能会问，如果我在 `session_commit()` 结束 session 之后，又需要更新session怎么办？比如在初始化时把用户的信息加载到session中，然后关闭session，在表单校验后需要把表单错误信息写入到session中。
 
-如果你打算尝试使用 `session_start() `来重新启动 session，那么，你可能会遇到一系列的问题：
+如果你打算尝试使用 `session_start() `来重新启动 session，那么，你可能会遇到 headers_already_sent 的问题：
 
 ```php
 <?php
@@ -78,7 +78,7 @@ https://demo.ma.ttias.be/demo-php-blocking-sessions/
   $user_id = $_SESSSION['user_id'];  
  // update session
   $_SESSION['user_permission']  = ['canDoSomething' => true]; 
- // release session to prevent session blocking
+ // release session lock early, to prevent session blocking
   session_commit();
 
 ...
@@ -89,7 +89,7 @@ https://demo.ma.ttias.be/demo-php-blocking-sessions/
  session_start(); // you will probably get "headers already sent" warning
 ```
 
-此时，你需要使用 ob_start() 系列函数来防止第二次输出header之前有任何body的输出
+此时，你需要使用 ob_start() / ob_get_clean() 等方式来防止第二次输出header之前有任何body的输出
 
 ## 二. laravel 的 session 管理机制
 
@@ -190,26 +190,25 @@ class FileSessionHandler implements SessionHandlerInterface
 相同点：
 
 -   模式相同，都使用了中间变量： 打开存储器 -> 挂载到中间变量 -> 读写中间变量 -> 将中间变量写入存储器
+-   对于传统模式来说,该中间变量是 $_SESSION, 对于 laravel 来说,该中间变量是 
 
 不同点：
 
--   传统方式只要读写$_SESSION_ 变量即可，剩下的session过期，session回收，session 的读取，session 的持久化，以及响应的Header中设置 session相关的cookie 都由php自动完成
--   larave 每一步都是独立实现的。特别是 session 的读取和持久化，跟响应Header 是独立的，意味着即使输出了header，如 terminate() 阶段,你也依然可以读写session，当然，此时你不能再操作Header了。
+-   传统方式只要读写 $_SESSION 变量即可，剩下的 session 过期判断，回收，读取，持久化，以及在响应的 Header 中设置相关的响应头等都是由 php 内置的 session 模块自动完成的
+-   在 larave 中,上述的每一步都是在框架层由 StartSession 中间件实现的。
 -   传统方式，当你输出了 header ，或/及 body 之后，再尝试读写session 时，会产生一个 Warning
 -   laravel 方式，当你输出了 Header ，或/及 body 之后，再尝试读写session 时，不产生任何 Warning
 
 
 -   laravel 的打开存储器不加锁，
 -   传统方式打开存储器时默认会加锁，并且是事务锁，其他进程不可读，更不可写
--   laravel 在Session::save() 之前如果发生过多次 Session::start() ，那么每次都会真的打开存储器导致中间变量的修改会被重置
--   传统方式在 session_commit() 之前多次调用 session_start() 方法，只有第一次是有效的。
--   laravel 的 session 存取 跟 Header 中的 setCookie('laravel-session') 是独立的，
 
+-   同一个请求中,传统方式下,在一对 `session_start()` -> `session_commit()`  之间,如果出现了重复的 `session_start()`，那么这些多余的 `session_start()` 并不会重新打开存储器,而是直接被忽略。
+-   同一个请求中,laravel 机制下,在一对 `Session::start()` -> `Session::save()` 之间,如果出现了重复的 `Session::start()` ，那么每次 `Session::start()` 时,内存中的 session 数据都会与存储器中的最新数据进行合并. 因此,laravel 中的  `Session::start()` 方法可以理解成 `Session::mergeWithLatestStore()`
 
 -   laravel 的 session 更方便测试
 -   laravel 的 sessionHandler 选项更多，包含 database / apc / array / cookie
--   laravel 的 session 会保存两次 (handle() 一次， terminate() 又一次)
--   laravel 的 session 没有 lock() 方法
+-   由于 laravel 是在 php 层实现的 session 管理,如果请求在到达 Kernel 的 terminate() 阶段前就被 exit 了,那么 session 中的数据将丢失,无法保存到存储器.
 
 
 
@@ -220,24 +219,23 @@ class FileSessionHandler implements SessionHandlerInterface
 session 这个词翻译成中文叫做“会话”，现实中，两个人之间进行会话时，正常的形式都是你问我答，再问再答，如果你使用了分身术，一下子同时问好几个问题，我可以选择也选择使用分身术，然后每个我同时各自回答你的问题，也可以选择只有我一个人，挨个回答问题。
 
 ### 4.2 session racing problem ?
+如果对于同一个 sessionId 存在多个并发请求,那么这些并发的请求可能会并发地修改 session 中的数据,这样会可能导致最终的存储器中的数据被互相覆盖.
 
 
-
-### 4.3 session racing problem is a fake problem
+### 4.3 session racing problem should a fake problem
 
 session 的核心目的是区分当前http请求的访问者是哪一个用户/哪一个游客。
 
-系统识别出访问者之后，通常需要获取访问者的其他信息。由于sessionHandler 解析session资源获取用户id 这一步是不可避免的，那么，干脆让这一步顺便把其他信息也解析出来。这样就不用单独去数据库或缓存中查询其他信息了。
+session 存储方式从大的思路上可以分为两类: 
+- 一类是将 session 数据保存在用户的浏览器端,
+- 一类是将 session 数据保存在服务器端,如 file,redis,memcache 等
+不管是哪一类,session 数据中至少会保存该访问者的用户 id 
+对于前一类,session 数据的解析和存储都只涉及到响应头,服务器无需任何存储器,因此先不讨论.
+而对于后一类,由于连接并打开存储器,从而获取其中的用户id 这一步是不可避免的,因此,各种应用中,除了在存储器中保存用户id之外,还会保存一些其他的热点数据作为缓存,从而节省一次查询.
 
-session 中可以存什么样的数据？
-
--   用户标识 ，如 user_id (必须)
--   没有必要专门设计缓存 key 的一次性数据 ，如表单错误提示 (常用)，用户最后一次登陆时间等。
--   用户登录之后不会发生变更且其他请求会频繁使用到的信息 (可选，视实际业务而定，用于节省查询次数)
-
-session 中不应该存什么样的数据？
-
--   会频繁变动的数据，如用户最后一次请求的接口地址。如果存在session中，很明显会出现多个ajax并发请求时互相覆盖的问题
+因此,避免 session racing problem, 实际上也就是避免 cache racing problem. 
+我们知道,缓存中不应该存储变更特别频繁,或者实时性很重要的数据,这个原则对于 session 来说也是一样的. 
+相反,对于表单验证提示,菜单权限等数据就比较适合保存到 session 中. 这些场景并不会产生 session racing problem
 
 ### 4.4 access_token or session_cookie ?
 
