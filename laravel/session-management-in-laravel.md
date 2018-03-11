@@ -222,13 +222,13 @@ session 这个词翻译成中文叫做“会话”，现实中，两个人之间
 
 ### 4.3 session racing problem should be a fake problem
 
-session 的核心目的是区分当前http请求的访问者是哪一个用户/哪一个游客。
+session 的核心目的是区分当前http请求的访问者是哪一个用户。
 
 session 存储方式从大的思路上可以分为两类: 
-- 一类是将 session 数据保存在用户的浏览器端,
-- 一类是将 session 数据保存在服务器端,如 file,redis,memcache 等
+- 一类是将 session 数据存储在用户的浏览器端,
+- 一类是将 session 数据存储在服务器端,如 file,redis,memcache 等
 不管是哪一类,session 数据中至少会保存该访问者的用户 id   
-对于前一类,session 数据的解析和存储都只涉及到响应头,服务器无需任何存储器,因此先不讨论.  
+对于前一类,session 数据的解析和存储都只涉及到请求头和响应头,服务器无需任何存储器,因此先不讨论.  
 而对于后一类,由于连接并打开存储器,从而获取其中的用户id 这一步是不可避免的,因此,各种实践中,除了在存储器中保存用户id之外,还会保存一些其他的热点数据作为缓存,从而节省一次查询.  
 
 因此,避免 session racing problem, 实际上也就是避免 cache racing problem.   
