@@ -44,7 +44,38 @@
 
 -   session 的自动回收此处不分析
 
-注意 `session_start()`的第一阶段，即对应的 `sessionHandler  ` 使用 `open()` 方法打开对应的资源时，如果 sessionHandler  类型为  `file` 或 `memcache` , 那么 `open()` 方法会 **自动给打开的资源上锁**。
+注意 `session_start()`的第一阶段，即对应的 `sessionHandler  ` 使用 `open()` 方法打开对应的资源时，如果 sessionHandler  类型为  `file` 或 `memcache` , 那么 `open()` 方法会 **自动给打开的资源上锁**。该锁为 LOCK_EX 类型(排他锁),意味着如果该锁被其他的进程获取了,那么当前进程会堵塞,直到该锁被其他所有进程释放.
+
+```c
+// 相关文件: https://github.com/php/php-src/blob/master/ext/session/mod_files.c#L156
+// data->fd 即为保存当前 session 的文件
+
+static void ps_files_open(ps_files *data, const char *key)
+{
+......
+
+		if (data->fd != -1) {
+......
+			do {
+				ret = flock(data->fd, LOCK_EX);
+			} while (ret == -1 && errno == EINTR);
+
+#ifdef F_SETFD
+# ifndef FD_CLOEXEC
+#  define FD_CLOEXEC 1
+# endif
+			if (fcntl(data->fd, F_SETFD, FD_CLOEXEC)) {
+				php_error_docref(NULL, E_WARNING, "fcntl(%d, F_SETFD, FD_CLOEXEC) failed: %s (%d)", data->fd, strerror(errno), errno);
+			}
+#endif
+		} else {
+			php_error_docref(NULL, E_WARNING, "open(%s, O_RDWR) failed: %s (%d)", buf, strerror(errno), errno);
+		}
+	}
+}
+```
+
+
 
 因此，在某个请求[打开session之后，提交session之前]的这段时间里，如果有其它的相同 sessionId 的请求执行到了  `session_start() ` ，这些请求都会进入阻塞状态，直到这个 session 资源上的锁被释放。
 
