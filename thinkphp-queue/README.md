@@ -201,7 +201,13 @@ namespace application\index\controller;
        * @param array|mixed    $data     发布任务时自定义的数据
        */
       public function fire(Job $job,$data){
-          
+          // 如有必要,可以根据业务需求和数据库中的最新数据,判断该任务是否仍有必要执行.
+          $isJobStillNeedToBeDone = $this->checkDatabaseToSeeIfJobNeedToBeDone($data);
+          if(!isJobStillNeedToBeDone){
+              $job->delete();
+              return;
+          }
+        
           $isJobDone = $this->doHelloJob($data);
         
           if ($isJobDone) {
@@ -218,6 +224,15 @@ namespace application\index\controller;
                   //$job->release(2); //$delay为延迟时间，表示该任务延迟2秒后再执行
               }
           }
+      }
+      
+      /**
+       * 有些消息在到达消费者时,可能已经不再需要执行了
+       * @param array|mixed    $data     发布任务时自定义的数据
+       * @return boolean                 任务执行的结果
+       */
+      private function checkDatabaseToSeeIfJobNeedToBeDone($data){
+          return true;
       }
 
       /**
