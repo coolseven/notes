@@ -10,7 +10,7 @@
 
  对于可以并行执行的 ajax 请求，我们可以在 js 中同时触发这些请求，并期望这些 ajax 请求在后端也被并行执行。但是，如果我们打开浏览器开发工具中的 network 面板，我们会发现，这些 ajax 请求虽然是同时触发并同时到达后端的，但是只有某个一个 ajax 请求处理完成之后，另一个 ajax 请求才会真正开始被处理。
 
-https://demo.ma.ttias.be/demo-php-blocking-sessions/
+ 你可以打开这个网站,在 F12 模式下观察 xhr 的时间顺序: https://demo.ma.ttias.be/demo-php-blocking-sessions/
 
 ### 1.2 如何重现这个问题
 
@@ -189,22 +189,23 @@ class FileSessionHandler implements SessionHandlerInterface
 
 相同点：
 
--   模式相同，都使用了中间变量： 打开存储器 -> 挂载到中间变量 -> 读写中间变量 -> 将中间变量写入存储器
--   对于传统模式来说,该中间变量是 $_SESSION, 对于 laravel 来说,该中间变量是 
+-   模式相同，都使用了中间变量： 打开存储器 -> 挂载到变量 -> 读写变量 -> 将变量持久化到存储器
+-   对于传统模式来说,该变量是 $_SESSION, 
+-   对于 laravel 来说,该变量是 Illuminicate\Session\Store 对象上的 attributes 属性
 
 不同点：
 
 -   传统方式只要读写 $_SESSION 变量即可，剩下的 session 过期判断，回收，读取，持久化，以及在响应的 Header 中设置相关的响应头等都是由 php 内置的 session 模块自动完成的
 -   在 larave 中,上述的每一步都是在框架层由 StartSession 中间件实现的。
--   传统方式，当你输出了 header ，或/及 body 之后，再尝试读写session 时，会产生一个 Warning
--   laravel 方式，当你输出了 Header ，或/及 body 之后，再尝试读写session 时，不产生任何 Warning
+-   传统方式，当你输出了 header ，或/及 body 之后，再尝试读写session 时，会产生一个 'headers alreay sent' 的 Warning
+-   laravel 方式，由于 $_SESSION 变量并不存在,因此,当你输出了 Header ，或/及 body 之后，再尝试读写 session 时，并不会产生任何 Warning
 
 
 -   laravel 的打开存储器不加锁，
 -   传统方式打开存储器时默认会加锁，并且是事务锁，其他进程不可读，更不可写
 
 -   同一个请求中,传统方式下,在一对 `session_start()` -> `session_commit()`  之间,如果出现了重复的 `session_start()`，那么这些多余的 `session_start()` 并不会重新打开存储器,而是直接被忽略。
--   同一个请求中,laravel 机制下,在一对 `Session::start()` -> `Session::save()` 之间,如果出现了重复的 `Session::start()` ，那么每次 `Session::start()` 时,内存中的 session 数据都会与存储器中的最新数据进行合并. 因此,laravel 中的  `Session::start()` 方法可以理解成 `Session::mergeWithLatestStore()`
+-   同一个请求中,laravel 机制下,在一对 `Session::start()` -> `Session::save()` 之间,如果出现了重复的 `Session::start()` ，那么每次 `Session::start()` 时,内存中的 session 数据都会与存储器中的最新数据进行合并. 因此,laravel 中的  `Session::start()` 方法可以理解成 `Session::mergeAttributesWithLatestStore()`
 
 -   laravel 的 session 更方便测试
 -   laravel 的 sessionHandler 选项更多，包含 database / apc / array / cookie
@@ -216,26 +217,26 @@ class FileSessionHandler implements SessionHandlerInterface
 
 ### 4.1 重新认识session
 
-session 这个词翻译成中文叫做“会话”，现实中，两个人之间进行会话时，正常的形式都是你问我答，再问再答，如果你使用了分身术，一下子同时问好几个问题，我可以选择也选择使用分身术，然后每个我同时各自回答你的问题，也可以选择只有我一个人，挨个回答问题。
+session 这个词翻译成中文叫做“会话”，现实中，两个人之间进行会话时，正常的形式都是你问我答，再问再答，如果你使用了分身术，一下子同时问好几个问题，我可以选择也使用分身术，然后每个我同时各自回答你的问题，也可以选择只有我一个人，挨个回答问题。
 
 ### 4.2 session racing problem ?
 如果对于同一个 sessionId 存在多个并发请求,那么这些并发的请求可能会并发地修改 session 中的数据,这样会可能导致最终的存储器中的数据被互相覆盖.
 
 
-### 4.3 session racing problem should a fake problem
+### 4.3 session racing problem should be a fake problem
 
 session 的核心目的是区分当前http请求的访问者是哪一个用户/哪一个游客。
 
 session 存储方式从大的思路上可以分为两类: 
 - 一类是将 session 数据保存在用户的浏览器端,
 - 一类是将 session 数据保存在服务器端,如 file,redis,memcache 等
-不管是哪一类,session 数据中至少会保存该访问者的用户 id 
-对于前一类,session 数据的解析和存储都只涉及到响应头,服务器无需任何存储器,因此先不讨论.
-而对于后一类,由于连接并打开存储器,从而获取其中的用户id 这一步是不可避免的,因此,各种应用中,除了在存储器中保存用户id之外,还会保存一些其他的热点数据作为缓存,从而节省一次查询.
+不管是哪一类,session 数据中至少会保存该访问者的用户 id   
+对于前一类,session 数据的解析和存储都只涉及到响应头,服务器无需任何存储器,因此先不讨论.  
+而对于后一类,由于连接并打开存储器,从而获取其中的用户id 这一步是不可避免的,因此,各种实践中,除了在存储器中保存用户id之外,还会保存一些其他的热点数据作为缓存,从而节省一次查询.  
 
-因此,避免 session racing problem, 实际上也就是避免 cache racing problem. 
-我们知道,缓存中不应该存储变更特别频繁,或者实时性很重要的数据,这个原则对于 session 来说也是一样的. 
-相反,对于表单验证提示,菜单权限等数据就比较适合保存到 session 中. 这些场景并不会产生 session racing problem
+因此,避免 session racing problem, 实际上也就是避免 cache racing problem.   
+我们知道,缓存中不应该存储变更特别频繁,或者实时性很重要的数据,这个原则对于 session 来说也是一样的.   
+相反,对于表单验证提示,菜单权限等数据就比较适合保存到 session 中. 这些场景并不会产生 session racing problem  
 
 ### 4.4 access_token or session_cookie ?
 
