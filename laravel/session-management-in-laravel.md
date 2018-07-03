@@ -272,6 +272,8 @@ session 存储方式从大的思路上可以分为两类:
 
 https://wiki.php.net/rfc/session-lock-ini
 
+https://ma.ttias.be/php-session-locking-prevent-sessions-blocking-in-requests/
+
 
 
 
