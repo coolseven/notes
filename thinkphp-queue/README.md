@@ -822,17 +822,17 @@ public function failed($jobData){
 
 各个类之间的关系图如下：
 
-![thinkphp-queue类关系图](https://blog.huzhongyuan.com/wp-content/uploads/2017/02/thinkphp-queue%E7%B1%BB%E5%85%B3%E7%B3%BB%E5%9B%BE.svg)
+![thinkphp-queue类关系图](https://github.com/coolseven/notes/blob/master/thinkphp-queue/thinkphp-queue%E7%B1%BB%E5%85%B3%E7%B3%BB%E5%9B%BE.svg)
 
 #### 3.3 Deamon模式的执行流程
 
-![Daemon模式与非daemon模式状态图](https://blog.huzhongyuan.com/wp-content/uploads/2017/02/Daemon%E6%A8%A1%E5%BC%8F%E4%B8%8E%E9%9D%9Edaemon%E6%A8%A1%E5%BC%8F%E7%8A%B6%E6%80%81%E5%9B%BE.svg)
+![Daemon模式与非daemon模式状态图](https://github.com/coolseven/notes/blob/master/thinkphp-queue/Daemon%E6%A8%A1%E5%BC%8F%E4%B8%8E%E9%9D%9Edaemon%E6%A8%A1%E5%BC%8F%E7%8A%B6%E6%80%81%E5%9B%BE.svg)
 
 #### 3.4 Database模式下消息处理的详细流程 
 
 下图中，展示了database 模式下消息处理的详细流程，redis 驱动下大体类似
 
-![Database模式下消息获取和执行的具体流程](https://blog.huzhongyuan.com/wp-content/uploads/2017/02/Database%E9%A9%B1%E5%8A%A8%E4%B8%8B%E6%B6%88%E6%81%AF%E5%A4%84%E7%90%86%E7%9A%84%E5%85%B7%E4%BD%93%E6%B5%81%E7%A8%8B.svg)
+![Database模式下消息获取和执行的具体流程](https://github.com/coolseven/notes/blob/master/thinkphp-queue/%E6%B6%88%E6%81%AF%E8%8E%B7%E5%8F%96%E5%92%8C%E6%89%A7%E8%A1%8C%E7%9A%84%E5%85%B7%E4%BD%93%E6%B5%81%E7%A8%8B.svg)
 
 #### 3.5 redis 驱动下的任务重发细节
 
@@ -848,11 +848,11 @@ public function failed($jobData){
 
 redis队列中的过期任务重发步骤--执行前：
 
-![redis队列中的过期任务重发步骤-执行前](https://blog.huzhongyuan.com/wp-content/uploads/2017/02/redis%E9%98%9F%E5%88%97%E4%B8%AD%E7%9A%84%E4%BB%BB%E5%8A%A1%E7%AE%A1%E7%90%86-1.png)
+![redis队列中的过期任务重发步骤-执行前](redis队列中的任务管理-1.png)
 
 redis队列中的过期任务重发步骤--执行后：
 
-![redis队列中的过期任务重发步骤--执行后](https://blog.huzhongyuan.com/wp-content/uploads/2017/02/redis%E9%98%9F%E5%88%97%E4%B8%AD%E7%9A%84%E4%BB%BB%E5%8A%A1%E7%AE%A1%E7%90%86-2.png)
+![redis队列中的过期任务重发步骤--执行后](redis队列中的任务管理-2.png)
 
 #### 3.6 thinkphp-queue的性能
 
