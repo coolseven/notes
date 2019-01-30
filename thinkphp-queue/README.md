@@ -880,6 +880,8 @@ redis队列中的过期任务重发步骤--执行后：
 
 -   **3.7.5** 配置的 expire `不为null` ，但配置的 expire 时间太短，以至于  expire 时间 < 消费者的 `fire()` 方法所需时间 +  删除该任务所需的时间 ，那么任务将被误认为执行超时，从而被消息队列还原为待执行状态。
 
+-   **3.7.6** queue:work 属于 cli 模式, 其入口文件是根目录下的 think 文件, 网页访问属于 sapi 模式, 其入口是 public 目录下的 index.php 文件.  如果需要在入口文件中定义自定义常量, 记得去修改对应的入口文件.   具体可参考 chichoyi 的说明 https://github.com/coolseven/notes/issues/7
+
 
 ### 四 拓展
 
