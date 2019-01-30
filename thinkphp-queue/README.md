@@ -52,13 +52,13 @@ thinkphp-queue 内置了 **Redis**，**Database**，**Topthink** ，**Sync**这�
 #### 1.1 安装 thinkphp-queue
 
 ```bash
-composer install thinkphp-queue
+composer install topthink/think-queue
 ```
 #### 1.2 搭建消息队列的存储环境
 
 - 使用 Redis [**推荐**]
 
-  ```json
+  ```
   安装并启动 Redis 服务
   ```
 
@@ -84,15 +84,15 @@ composer install thinkphp-queue
 
 ```php
    return [
-       'connector'  => 'Redis',		    // Redis 驱动
-       'expire'     => 60,				// 任务的过期时间，默认为60秒; 若要禁用，则设置为 null 
+       'connector'  => 'Redis',		  // Redis 驱动
+       'expire'     => 60,				  // 任务的过期时间，默认为60秒; 若要禁用，则设置为 null 
        'default'    => 'default',		// 默认的队列名称
        'host'       => '127.0.0.1',	    // redis 主机ip
-       'port'       => 6379,			// redis 端口
-       'password'   => '',				// redis 密码
-       'select'     => 0,				// 使用哪一个 db，默认为 db0
-       'timeout'    => 0,				// redis连接的超时时间
-       'persistent' => false,			// 是否是长连接
+       'port'       => 6379,		    // redis 端口
+       'password'   => '',				  // redis 密码
+       'select'     => 0,				    // 使用哪一个 db，默认为 db0
+       'timeout'    => 0,				    // redis连接的超时时间
+       'persistent' => false,			  // 是否是长连接
      
    //    'connector' => 'Database',   // 数据库驱动
    //    'expire'    => 60,           // 任务的过期时间，默认为60秒; 若要禁用，则设置为 null
@@ -116,7 +116,7 @@ composer install thinkphp-queue
 
    **1.3.1 配置文件中的 expire 参数说明**
 
-   expire 参数指的是任务的过期时间。 过期的任务，其准确的定义是
+   expire 参数指的是任务的过期时间, 单位为秒。 过期的任务，其准确的定义是
 
 1. 任务的状态为执行中
 2. 任务的开始执行的时刻 + expire > 当前时刻 
@@ -126,7 +126,6 @@ expire 不为`null` 时 ，thinkphp-queue 会在每次获取下一个任务之�
 expire 为`null` 时，thinkphp-queue 不会检查过期的任务，性能相对较高一点。但是需要注意：
 
 - 这些执行超时的任务会一直留在消息队列中，需要开发者另行处理(删除或者重发)！
-- [ **[Bug](https://github.com/top-think/think-queue/issues/12)** ]在redis 驱动下，expire 设置为 null 时，无法实现任务的延迟执行!  (Database 驱动下无影响)
 
 **对expire 参数理解或者使用不当时，很容易产生一些bug**，后面会举例提到。
 
@@ -142,7 +141,7 @@ expire 为`null` 时，thinkphp-queue 不会检查过期的任务，性能相对
 * 文件路径： \application\index\controller\JobTest.php
 * 该控制器的业务代码中借助了thinkphp-queue 库，将一个消息推送到消息队列
 */
-namespace application\index\controller;
+namespace app\index\controller;
   use think\Exception;
 
   use think\Queue;
@@ -155,7 +154,7 @@ namespace application\index\controller;
       
       // 1.当前任务将由哪个类来负责处理。 
       //   当轮到该任务时，系统将生成一个该类的实例，并调用其 fire 方法
-      $jobHandlerClassName  = 'application\index\job\Hello'; 
+      $jobHandlerClassName  = 'app\index\job\Hello'; 
       // 2.当前任务归属的队列名称，如果为新队列，会自动创建
       $jobQueueName  	  = "helloJobQueue"; 
       // 3.当前任务所需的业务数据 . 不能为 resource 类型，其他类型最终将转化为json形式的字符串
@@ -175,7 +174,7 @@ namespace application\index\controller;
 
 **注意:** 在这个例子当中，我们是手动指定的 `$jobHandlerClassName` ，更合理的做法是先定义好消息名称与消费者类名的映射关系，然后由某个可以获取该映射关系的类来推送这个消息。这样，生产者只需要知道消息的名称，而无需指定哪个消费者类来处理。
 
-> 除了 `Queue::push( $jobHandlerClassName , $jobData , $jobQueueName );	`这种方式之外，还可以直接传入 `Queue::push( $jobHandlerObject ,null , $jobQueueName );` 这时，需要在 $jobHandlerObject 中定义一个 `handle()` 方法，消息队列在执行到该任务时会自动反序列化该对象，并调用其 `handle()`方法。 该方式的缺点是无法传入自定义数据。
+> 除了 `Queue::push( $jobHandlerClassName , $jobData , $jobQueueName );	`这种方式之外，还可以直接传入 `Queue::push( $jobHandlerObject ,null , $jobQueueName );` 这时，需要在 $jobHandlerObject 中定义一个 `handle()` 方法，消息队列在执行到该任务时会自动反序列化该对象，并调用其 `handle()`方法。 该方式中, 数据需要提前挂载在 $jobHandlerObject 对象上。
 
 #### 1.5 消息的消费与删除
 
@@ -189,7 +188,7 @@ namespace application\index\controller;
    * 文件路径： \application\index\job\Hello.php
    * 这是一个消费者类，用于处理 helloJobQueue 队列中的任务
    */
-  namespace application\index\job;
+  namespace app\index\job;
 
   use think\queue\Job;
 
@@ -200,8 +199,9 @@ namespace application\index\controller;
        * @param Job            $job      当前的任务对象
        * @param array|mixed    $data     发布任务时自定义的数据
        */
-      public function fire(Job $job,$data){
-          // 如有必要,可以根据业务需求和数据库中的最新数据,判断该任务是否仍有必要执行.
+      public function fire(Job $job,$data)
+      {
+          // 有些消息在到达消费者时,可能已经不再需要执行了
           $isJobStillNeedToBeDone = $this->checkDatabaseToSeeIfJobNeedToBeDone($data);
           if(!isJobStillNeedToBeDone){
               $job->delete();
@@ -211,14 +211,14 @@ namespace application\index\controller;
           $isJobDone = $this->doHelloJob($data);
         
           if ($isJobDone) {
-              //如果任务执行成功， 记得删除任务
+              // 如果任务执行成功， 记得删除任务
               $job->delete();
               print("<info>Hello Job has been done and deleted"."</info>\n");
           }else{
               if ($job->attempts() > 3) {
                   //通过这个方法可以检查这个任务已经重试了几次了
                   print("<warn>Hello Job has been retried more than 3 times!"."</warn>\n");
-  				$job->delete();
+  				        $job->delete();
                   // 也可以重新发布这个任务
                   //print("<info>Hello Job will be availabe again after 2s."."</info>\n");
                   //$job->release(2); //$delay为延迟时间，表示该任务延迟2秒后再执行
@@ -285,7 +285,7 @@ php think queue:work --queue helloJobQueue
 
 #### 2.1 命令模式
 
-- **queue:subscribe 命令** [截至2017-02-15，作者暂未实现该模式，略过]
+- **queue:subscribe 命令** [官方未提供示例, 略过]
 
 - **queue:work 命令**
 
@@ -297,7 +297,7 @@ php think queue:work --queue helloJobQueue
 
 - **queue:listen 命令**
 
-  listen 命令： 该命令将会创建一个 listen 父进程 ，然后由父进程通过 `proc_open(‘php think queue:work’)` 的方式来创建一个work 子 进程来处理消息队列，且限制该work进程的执行时间。 
+  listen 命令： 该命令将会启动一个 listen 进程 ，然后由 listen 进程通过 `proc_open(‘php think queue:work  --queue="%s" --delay=%s --memory=%s --sleep=%s --tries=%s’)` 的方式来创建一个 work 进程来消费消息队列, 并且限制该 work 进程的执行时间, 同时通过管道来监听 work 进程的输出，。 
 
   ```bash
   php think queue:listen --queue helloJobQueue
@@ -327,7 +327,7 @@ php think queue:work --queue helloJobQueue
   --memory 128 \       //该进程允许使用的内存上限，以 M 为单位
   --sleep  3 \         //如果队列中无任务，则多长时间后重新检查，daemon模式下有效
   --tries  0 \         //如果任务已经超过重发次数上限，则进入失败处理逻辑，默认为0
-  --timeout 60         //创建的work子进程的允许执行的最长时间，以秒为单位
+  --timeout 60         //进程允许执行的最长时间，以秒为单位
   ```
 
   可以看到 listen 模式下，不包含 `--deamon` 参数，原因下面会说明
@@ -347,16 +347,18 @@ php think queue:work --queue helloJobQueue
     - 单次执行：不添加 `--daemon`参数，该模式下,work进程在处理完下一个消息后直接结束当前进程。当不存在新消息时，会sleep一段时间然后退出。
     - 循环执行：添加了 `--daemon`参数，该模式下,work进程会循环地处理队列中的消息，直到内存超出参数配置才结束进程。当不存在新消息时，会在每次循环中sleep一段时间。
 
-  - listen 命令是 **父进程 + 子进程** 的处理模式。
+  - listen 命令是 **双进程 + 管道** 的处理模式。
 
-    listen命令所在的父进程会创建一个**单次执行模式的work子进程**，并通过该work子进程来处理队列中的下一个消息，当这个work子进程退出之后，listen命令所在的父进程会监听到该子进程的退出信号，并重新创建一个新的**单次执行的work子进程**
+    listen命令所在的进程会创建一个**单次执行模式的 work 进程**，并通过该 work 进程来处理队列中的下一个消息，
+    - listen 进程会每秒检查一次自身的执行时间是否超过了 --timeout 参数的值, 如果已超时, 则 listen 进程会 kill 掉 work 进程, 然后抛出异常
+    - listen 进程会通过管道来监听 work 进程的输出, 当 work 进程有输出时, listen 进程会将输出写入到 stdout
 
-- **2.3.2 退出时机不同**
+- **2.3.2 结束时机不同**
 
-  - work 命令的退出时机在上面的执行原理部分已叙述，此处不再重复
-  - listen 命令中，listen所在的父进程正常情况会一直运行，除非遇到下面两种情况：
-    - 创建的某个work子进程的执行时间超过了 listen命令行中的`--timeout` 参数配置，此时work子进程会被强制结束，listen所在的父进程也会抛出一个 `ProcessTimeoutException` 异常并退出。开发者可以选择捕获该异常，让父进程继续执行，也可以选择通过 supervisor 等监控软件重启一个新的listen命令。
-    - listen 命令所在的父进程因某种原因存在内存泄露，则当父进程本身占用的内存超过了命令行中的 `--memory` 参数配置时，父子进程均会退出。正常情况下，listen进程本身占用的内存是稳定不变的。
+  - work 命令的结束时机在上面的执行原理部分已叙述，此处不再重复
+  - listen 命令中，listen 进程和 work 进程会在以下情况下结束：
+    - listen 进程会每秒检查一次自身的执行时间是否超过了 --timeout 参数的值，如果已超时, 此时 listen 进程会先 kill 掉 work 进程, 然后抛出一个 `ProcessTimeoutException` 异常并结束
+    - listen 进程会每秒检查一次自身使用的内存是否超过了 --memory 参数的值，如果已超过, 此时 listen 进程会直接 die 掉, work 进程也因此自动结束.
 
 - **2.3.3 性能不同**
 
@@ -387,17 +389,17 @@ php think queue:work --queue helloJobQueue
 
     **work 模式下的超时控制能力，实际上应该理解为 多个work 进程配合下的过期任务重发能力。**
 
-  - 而 listen命令可以限制其创建的work子进程的超时时间。
+  - 而 listen 命令可以限制其 listen 进程以及 listen 进程创建的 work 进程的最大执行时间。
 
-    listen 命令可通过 `--timeout` 参数限制work子进程允许运行的最长时间，超过该时间限制仍未结束的子进程会被强制结束；
+    listen 命令可通过 `--timeout` 参数限制 listen 进程允许运行的最长时间，超过该时间限制后, work 进程会被强制 kill 掉, listen 进程本身也会抛出异常并结束；
 
   - 这里有必要补充一下 expire 和 timeout 之间的区别：
 
     - expire 在配置文件中设置，timeout 在 listen命令 的命令行参数中设置，而且，expire 和 timeout 是两个不同层次上的概念：
 
 
-    - expire 是指任务的过期时间。这个时间是全局的，影响到所有的work进程。(不管是独立的work命令还是 listen 模式下创建的的work子进程) 。expire 针对的对象是 **任务**。
-    - timeout 是指work子进程的超时时间。这个时间只对当前执行的listen 命令有效。timeout 针对的对象是 **work子进程**。
+    - expire 是指任务的过期时间。这个时间是全局的，影响到所有的work进程。(不管是独立的work命令还是 listen 模式下创建的的 work 进程) 。expire 针对的对象是 **任务**。
+    - timeout 是指 listen 进程的超时时间。这个时间只对当前执行的 listen 命令有效。timeout 针对的对象是 **listen 进程**。
 
 - **2.3.5 使用场景不同**
 
@@ -494,7 +496,7 @@ php think queue:work --queue helloJobQueue
    * 文件路径： \application\index\job\MultiTask.php
    * 这是一个消费者类，用于处理 multiTaskJobQueue 队列中的任务
    */
-  namespace application\index\job;
+  namespace app\index\job;
 
   use think\queue\Job;
 
@@ -692,7 +694,7 @@ return [
  * 这是一个行为类，用于处理所有的消息队列中的任务失败回调
  */
 
-namespace application\behavior;
+namespace app\behavior;
 
 
 class MyQueueFailedLogger {
