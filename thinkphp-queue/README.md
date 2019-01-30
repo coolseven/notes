@@ -3,7 +3,7 @@
 ## thinkphp-queue 笔记 
 
 ### 前言 
-**当前笔记中的内容针对的是 thinkphp-queue 的 v1.1.2 版本，现在官方已经更新到了 v1.1.3 版本， 下文中提到的几个Bug在最新的master分支上均已修复。 笔记中的部分内容还未更新。**
+**当前笔记中的内容针对的是 thinkphp-queue 的 v2.0 版本
 
 传统的程序执行流程一般是 即时|同步|串行的，在某些场景下，会存在并发低，吞吐量低，响应时间长等问题。在大型系统中，一般会引入消息队列的组件，将流程中部分任务抽离出来放入消息队列，并由专门的消费者作针对性的处理，从而降低系统耦合度，提高系统性能和可用性。
 
@@ -37,7 +37,7 @@ thinkphp-queue 内置了 **Redis**，**Database**，**Topthink** ，**Sync**这�
 
 注1：如无特殊说明，下文中的 ‘消息’ 和 ‘任务’两个词指代的是同一个概念，即队列中的一个成员。该成员对消息队列而言是其内部保存的消息； 对业务应用而言是一个待执行的任务。请根据语境区分。
 
-注2：本文编写时(2017-02-15)使用的 thinkphp-queue 的版本号是 v1.1.2 。该版本中部分功能并未全部完成，如 subscribe 模式，以及存在几个bug(稍后会提及)。如有变更，请以官方最新版为准。
+注2：本文编写时(2019-01-30)使用的 thinkphp-queue 的版本号是 v2.0 。如有变更，请以官方最新版为准。
 
 
 
@@ -84,15 +84,15 @@ composer install topthink/think-queue
 
 ```php
    return [
-       'connector'  => 'Redis',		  // Redis 驱动
-       'expire'     => 60,				  // 任务的过期时间，默认为60秒; 若要禁用，则设置为 null 
+       'connector'  => 'Redis',		// Redis 驱动
+       'expire'     => 60,		// 任务的过期时间，默认为60秒; 若要禁用，则设置为 null 
        'default'    => 'default',		// 默认的队列名称
-       'host'       => '127.0.0.1',	    // redis 主机ip
-       'port'       => 6379,		    // redis 端口
-       'password'   => '',				  // redis 密码
-       'select'     => 0,				    // 使用哪一个 db，默认为 db0
-       'timeout'    => 0,				    // redis连接的超时时间
-       'persistent' => false,			  // 是否是长连接
+       'host'       => '127.0.0.1',	// redis 主机ip
+       'port'       => 6379,		// redis 端口
+       'password'   => '',		// redis 密码
+       'select'     => 0,		// 使用哪一个 db，默认为 db0
+       'timeout'    => 0,		// redis连接的超时时间
+       'persistent' => false,		// 是否是长连接
      
    //    'connector' => 'Database',   // 数据库驱动
    //    'expire'    => 60,           // 任务的过期时间，默认为60秒; 若要禁用，则设置为 null
@@ -155,13 +155,17 @@ namespace app\index\controller;
       // 1.当前任务将由哪个类来负责处理。 
       //   当轮到该任务时，系统将生成一个该类的实例，并调用其 fire 方法
       $jobHandlerClassName  = 'app\index\job\Hello'; 
+      
       // 2.当前任务归属的队列名称，如果为新队列，会自动创建
       $jobQueueName  	  = "helloJobQueue"; 
+      
       // 3.当前任务所需的业务数据 . 不能为 resource 类型，其他类型最终将转化为json形式的字符串
-      //   ( jobData 为对象时，需要在先在此处手动序列化，否则只存储其public属性的键值对)
+      //   ( jobData 为对象时，存储其public属性的键值对 )
       $jobData       	  = [ 'ts' => time(), 'bizId' => uniqid() , 'a' => 1 ] ;
+      
       // 4.将该任务推送到消息队列，等待对应的消费者去执行
       $isPushed = Queue::push( $jobHandlerClassName , $jobData , $jobQueueName );	
+      
       // database 驱动时，返回值为 1|false  ;   redis 驱动时，返回值为 随机字符串|false
       if( $isPushed !== false ){  
           echo date('Y-m-d H:i:s') . " a new Hello Job is Pushed to the MQ"."<br>";
@@ -174,7 +178,7 @@ namespace app\index\controller;
 
 **注意:** 在这个例子当中，我们是手动指定的 `$jobHandlerClassName` ，更合理的做法是先定义好消息名称与消费者类名的映射关系，然后由某个可以获取该映射关系的类来推送这个消息。这样，生产者只需要知道消息的名称，而无需指定哪个消费者类来处理。
 
-> 除了 `Queue::push( $jobHandlerClassName , $jobData , $jobQueueName );	`这种方式之外，还可以直接传入 `Queue::push( $jobHandlerObject ,null , $jobQueueName );` 这时，需要在 $jobHandlerObject 中定义一个 `handle()` 方法，消息队列在执行到该任务时会自动反序列化该对象，并调用其 `handle()`方法。 该方式中, 数据需要提前挂载在 $jobHandlerObject 对象上。
+> 除了 `Queue::push( $jobHandlerClassName , $jobData , $jobQueueName );	`这种方式之外，还可以直接传入 `Queue::push( $jobHandlerObject ,null , $jobQueueName );` 这时，需要在 $jobHandlerObject 中定义一个 `handle()` 方法，消息队列在执行到该任务时会自动反序列化该对象，并调用其 `handle()`方法。 该方式中, 数据需要提前挂载在 `$jobHandlerObject` 对象上。
 
 #### 1.5 消息的消费与删除
 
@@ -218,7 +222,9 @@ namespace app\index\controller;
               if ($job->attempts() > 3) {
                   //通过这个方法可以检查这个任务已经重试了几次了
                   print("<warn>Hello Job has been retried more than 3 times!"."</warn>\n");
+                  
   				        $job->delete();
+                  
                   // 也可以重新发布这个任务
                   //print("<info>Hello Job will be availabe again after 2s."."</info>\n");
                   //$job->release(2); //$delay为延迟时间，表示该任务延迟2秒后再执行
@@ -273,8 +279,6 @@ php think queue:work --queue helloJobQueue
 
 ![命令行执行结果](命令行执行结果.png)
 
-​
-
 
 
 至此，我们成功地经历了一个消息的 创建 -> 推送 -> 消费 -> 删除  的基本流程
@@ -297,7 +301,7 @@ php think queue:work --queue helloJobQueue
 
 - **queue:listen 命令**
 
-  listen 命令： 该命令将会启动一个 listen 进程 ，然后由 listen 进程通过 `proc_open(‘php think queue:work  --queue="%s" --delay=%s --memory=%s --sleep=%s --tries=%s’)` 的方式来创建一个 work 进程来消费消息队列, 并且限制该 work 进程的执行时间, 同时通过管道来监听 work 进程的输出，。 
+  listen 命令： 该命令将会启动一个 listen 进程 ，然后由 listen 进程通过 `proc_open(‘php think queue:work  --queue="%s" --delay=%s --memory=%s --sleep=%s --tries=%s’)` 的方式来周期性地创建一次性的 work 进程来消费消息队列, 并且限制该 work 进程的执行时间, 同时通过管道来监听 work 进程的输出，。 
 
   ```bash
   php think queue:listen --queue helloJobQueue
@@ -325,9 +329,9 @@ php think queue:work --queue helloJobQueue
   --queue  helloJobQueue \   //监听的队列的名称
   --delay  0 \         //如果本次任务执行抛出异常且任务未被删除时，设置其下次执行前延迟多少秒,默认为0
   --memory 128 \       //该进程允许使用的内存上限，以 M 为单位
-  --sleep  3 \         //如果队列中无任务，则多长时间后重新检查，daemon模式下有效
+  --sleep  3 \         //如果队列中无任务，则多长时间后重新检查
   --tries  0 \         //如果任务已经超过重发次数上限，则进入失败处理逻辑，默认为0
-  --timeout 60         //进程允许执行的最长时间，以秒为单位
+  --timeout 60         // work 进程允许执行的最长时间，以秒为单位
   ```
 
   可以看到 listen 模式下，不包含 `--deamon` 参数，原因下面会说明
@@ -344,21 +348,22 @@ php think queue:work --queue helloJobQueue
 
     按照是否设置了 `--daemon` 参数，work命令又可分为单次执行和循环执行两种模式。
 
-    - 单次执行：不添加 `--daemon`参数，该模式下,work进程在处理完下一个消息后直接结束当前进程。当不存在新消息时，会sleep一段时间然后退出。
-    - 循环执行：添加了 `--daemon`参数，该模式下,work进程会循环地处理队列中的消息，直到内存超出参数配置才结束进程。当不存在新消息时，会在每次循环中sleep一段时间。
+    - 单次执行：不添加 `--daemon`参数，该模式下,work进程在处理完下一个消息后直接结束当前进程。当队列为空时，会sleep一段时间然后退出。
+    - 循环执行：添加了 `--daemon`参数，该模式下,work进程会循环地处理队列中的消息，直到内存超出参数配置才结束进程。当队列为空时，会在每次循环中sleep一段时间。
 
   - listen 命令是 **双进程 + 管道** 的处理模式。
 
-    listen命令所在的进程会创建一个**单次执行模式的 work 进程**，并通过该 work 进程来处理队列中的下一个消息，
-    - listen 进程会每秒检查一次自身的执行时间是否超过了 --timeout 参数的值, 如果已超时, 则 listen 进程会 kill 掉 work 进程, 然后抛出异常
-    - listen 进程会通过管道来监听 work 进程的输出, 当 work 进程有输出时, listen 进程会将输出写入到 stdout
+    listen命令所在的进程会循环地创建 **单次执行模式的 work 进程**，每次创建的 work 进程只消费一个消息就会结束, 然后 listen 进程再创建一个新的 work 进程，
+    - listen 进程会定时检查一次当前的 work 进程执行时间是否超过了 --timeout 参数的值, 如果已超时, 则 listen 进程会 kill 掉 work 进程, 然后抛出异常
+    - listen 进程会通过管道来监听当前的 work 进程的输出, 当 work 进程有输出时, listen 进程会将输出写入到 stdout / stderr
+    - listen 进程会定时通过 `proc_get_status()` 来监控当前的 work 进程是否仍在运行, work 进程消费完任务之后, work 进程的状态会变成 terminated, 此时 listen 进程就会重新创建一个新的 work 进程, 然后定时检查新的 work 进程的执行时间是否超过了 --timeout 参数的值
 
 - **2.3.2 结束时机不同**
 
   - work 命令的结束时机在上面的执行原理部分已叙述，此处不再重复
   - listen 命令中，listen 进程和 work 进程会在以下情况下结束：
-    - listen 进程会每秒检查一次自身的执行时间是否超过了 --timeout 参数的值，如果已超时, 此时 listen 进程会先 kill 掉 work 进程, 然后抛出一个 `ProcessTimeoutException` 异常并结束
-    - listen 进程会每秒检查一次自身使用的内存是否超过了 --memory 参数的值，如果已超过, 此时 listen 进程会直接 die 掉, work 进程也因此自动结束.
+    - listen 进程会每秒检查一次当前的 work 进程的执行时间是否超过了 --timeout 参数的值，如果已超时, 此时 listen 进程会先 kill 掉当前的 work 进程, 然后抛出一个 `ProcessTimeoutException` 异常并结束 listen 进程
+    - listen 进程会定时检查一次自身使用的内存是否超过了 `--memory` 参数的值，如果已超过, 此时 listen 进程会直接 die 掉, work 进程也会自动结束.
 
 - **2.3.3 性能不同**
 
@@ -389,9 +394,9 @@ php think queue:work --queue helloJobQueue
 
     **work 模式下的超时控制能力，实际上应该理解为 多个work 进程配合下的过期任务重发能力。**
 
-  - 而 listen 命令可以限制其 listen 进程以及 listen 进程创建的 work 进程的最大执行时间。
+  - 而 listen 命令可以限制 listen 进程创建的 work 进程的最大执行时间。
 
-    listen 命令可通过 `--timeout` 参数限制 listen 进程允许运行的最长时间，超过该时间限制后, work 进程会被强制 kill 掉, listen 进程本身也会抛出异常并结束；
+    listen 命令可通过 `--timeout` 参数限制 work 进程允许运行的最长时间，超过该时间限制后, work 进程会被强制 kill 掉, listen 进程本身也会抛出异常并结束；
 
   - 这里有必要补充一下 expire 和 timeout 之间的区别：
 
@@ -399,7 +404,7 @@ php think queue:work --queue helloJobQueue
 
 
     - expire 是指任务的过期时间。这个时间是全局的，影响到所有的work进程。(不管是独立的work命令还是 listen 模式下创建的的 work 进程) 。expire 针对的对象是 **任务**。
-    - timeout 是指 listen 进程的超时时间。这个时间只对当前执行的 listen 命令有效。timeout 针对的对象是 **listen 进程**。
+    - timeout 是指 work 进程的超时时间。这个时间只对当前执行的 listen 命令有效。timeout 针对的对象是 **work 进程**。
 
 - **2.3.5 使用场景不同**
 
@@ -554,8 +559,10 @@ php think queue:work --queue helloJobQueue
 ```php
 // 即时执行
 $isPushed = Queue::push($jobHandlerClassName, $jobDataArr, $jobQueueName);
+
 // 延迟 2 秒执行
 $isPushed = Queue::later( 2, $jobHandlerClassName, $jobDataArr, $jobQueueName);
+
 // 延迟到 2017-02-18 01:01:01 时刻执行
 $time2wait = strtotime('2017-02-18 01:01:01') - strtotime('now');	
 $isPushed = Queue::later($time2wait,$jobHandlerClassName, $jobDataArr, $jobQueueName);
@@ -566,8 +573,10 @@ $isPushed = Queue::later($time2wait,$jobHandlerClassName, $jobDataArr, $jobQueue
 ```php
 // 重发，即时执行
 $job->release();
+
 // 重发，延迟 2 秒执行
 $job->release(2);
+
 // 延迟到 2017-02-18 01:01:01 时刻执行
 $time2wait = strtotime('2017-02-18 01:01:01') - strtotime('now');
 $job->release($time2wait);
@@ -607,7 +616,7 @@ if( $isJobDone === false){
 
 此外，消费者类中需要注意，如果 `fire()` 方法中可能抛出异常，那么
 
-- 如果不需要自动重发的话， 请在抛出异常之前将任务删除 `$job->delete()` ，以免产生bug。
+- 如果不需要自动重发的话， 请在抛出异常之前将任务删除 `$job->delete()` ，否则会被框架自动重发。
 - 如果需要自动重发的话，请直接抛出异常，不要在 `fire()` 方法中又手动使用 `$job->release()` , 这样会导致该任务被重发两次，产生两个一样的新任务。
 
 #### 2.8 任务的失败回调及告警
@@ -620,26 +629,6 @@ if( $isJobDone === false){
 - 消费者类中定义了 `failed()` 方法，用于接收任务失败的通知
 
 注意， `queue_failed` 标签需要在安装了 `thinkphp-queue ` 之后 **手动** 去 `\application\tags.php` 文件中添加。
-
-**注意：该版本有[bug](https://github.com/top-think/think-queue/issues/10)，若想实现失败任务回调功能，需要先修改位于 `think-queue\src\queue\Worker.php` 中的 `logFailedJob`方法 , 修改方式如下:**
-
-```php
-/**
- * Log a failed job into storage.
- * @param  \Think\Queue\Job $job
- * @return array
- */
-    protected function logFailedJob(Job $job)
-    {
-        // 将原来的 queue.failed' 修改为 'queue_failed' 才可以触发任务失败回调
-        if (Hook::listen('queue.failed', $job, null, true)) {  
-            $job->delete();
-            $job->failed();
-        }
-
-        return ['job' => $job, 'failed' => true];
-    } 
-```
 
 首先，我们添加 `queue_failed` 事件标签,  及其对应的回调方法
 
@@ -875,25 +864,8 @@ redis队列中的过期任务重发步骤--执行后：
 
 **注意：**由于在测试时，Host 机本身的cpu和内存长期100%，并且虚拟机中的各项服务并未专门调优，因此该测试结果**并不具备参考性**。
 
-#### 3.7 thinkphp-queue 的N种错误使用姿势
-
--   **3.7.1** 在 消费者类的 `fire()` 方法中，忘记使用 `$job->delete()` 去删除消息，这种情况下，会产生一系列的bug：
-
-    - 配置的 expire 为 `null` ， 则该任务被执行一次后会永远留在消息队列中，占用消息队列的空间 , 除非开发者另行处理。
-
-    - 配置的 expire `不为 null` ，该任务在 expire 秒后被认为是过期任务，并被消息队列还原为待执行状态，在消息队列的后面的循环中继续被获取，这时，如果
-
-      - 命令行中的 `--tries` 参数为0 或者未设置,那么每隔 一段时间该任务就会被执行一次。
-      - 命令行中的 `--tries` 参数 n 大于0 ， 那么当这个任务被误执行的次数超过n 时，会由消息队列尝试去触发失败回调事件:
-        - 如果开发者没有编写失败处理的回调事件：那么该任务仍然不会被删除，每隔一段时间就会被执行一次。[这个可能属于框架的[Bug](https://github.com/top-think/think-queue/issues/10)] , 
-        - 如果编写了失败回调事件
-          - 回调事件中删除了任务，则这个任务被误执行了 n 次。
-          - 回调事件中未删除任务，这时，如果：
-            - 回调事件返回值是 false，那么该任务仍然不会被删除，每隔一段时间就会被执行一次
-            - 回调事件返回值是 true， 那么该任务会先被删除，然后触发消费者类的 failed() 方法，如果在 failed() 方法中设置了告警，那么这个告警就是一次误报。
-
-    因此，在 使用 thinkphp-queue 时，请记得：
-
+#### 3.7 thinkphp-queue 的注意事项
+-   **3.7.1** 使用建议
     - **任务完成后, 使用 `$job->delete()` 删除任务**
     - 在消费者类的 `fire()` 方法中，使用 `$job->attempt()`  检查任务已执行次数，对于次数异常的，作相应的处理。
     - 在消费者类的 `fire()` 方法中，根据业务数据来判断该任务是否已经执行过，以避免该任务被重复执行。
@@ -904,13 +876,9 @@ redis队列中的过期任务重发步骤--执行后：
 
 -   **3.7.3** 使用了 `queue:work --daemon` ，但是消费者类的 fire() 方法中存在死循环，或 `sleep(n)` 等逻辑，导致消息队列被堵塞；或者使用了 `exit()` , `die()` 这样的逻辑，导致work进程直接终止 。
 
--   **3.7.4** 配置的 expire 为 `null` ，这时如果采用的是 Redis 驱动且使用了延迟功能，如 `later(n)`  ， `release(n)` 方法或者 `--delay` 参数不为0 ， 那么将导致被延迟的任务永远无法处理。(这个可能属于框架的[Bug](https://github.com/top-think/think-queue/issues/12))
+-   **3.7.4** 配置的 expire 为`null` ，但并没有自行处理过期的任务，导致过期的任务得不到处理，且一直占用消息队列的空间。
 
--   **3.7.5** 配置的 expire 为`null` ，但并没有自行处理过期的任务，导致过期的任务得不到处理，且一直占用消息队列的空间。
-
--   **3.7.6** 配置的 expire `不为null` ，但配置的 expire 时间太短，以至于  expire 时间 < 消费者的 `fire()` 方法所需时间 +  删除该任务所需的时间 ，那么任务将被误认为执行超时，从而被消息队列还原为待执行状态。
-
--   **3.7.7** 使用 `Queue::push($jobHandlerClassName , $jobData, $jobQueueName );` 推送任务时，`$jobData` 中包含未序列化的对象。这时，在消费者端拿到的 `$jobData ` 中拿到的是该对象的public 属性的键值对数组。因此，需要在推送前手动序列化对象，在消费者端再手动反序列化还原为对象。
+-   **3.7.5** 配置的 expire `不为null` ，但配置的 expire 时间太短，以至于  expire 时间 < 消费者的 `fire()` 方法所需时间 +  删除该任务所需的时间 ，那么任务将被误认为执行超时，从而被消息队列还原为待执行状态。
 
 
 ### 四 拓展
