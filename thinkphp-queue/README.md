@@ -3,7 +3,7 @@
 ## thinkphp-queue 笔记 
 
 ### 前言 
-**当前笔记中的内容针对的是 thinkphp-queue 的 v2.0 版本
+当前笔记中的内容针对的是 thinkphp-queue 的 v2.0 版本
 
 传统的程序执行流程一般是 即时|同步|串行的，在某些场景下，会存在并发低，吞吐量低，响应时间长等问题。在大型系统中，一般会引入消息队列的组件，将流程中部分任务抽离出来放入消息队列，并由专门的消费者作针对性的处理，从而降低系统耦合度，提高系统性能和可用性。
 
@@ -80,7 +80,7 @@ composer install topthink/think-queue
 
 #### 1.3 配置消息队列的驱动
 
-   根据选择的存储方式，在 `\application\extra\queue.php` 这个配置文件中，添加消息队列对应的驱动配置
+   根据选择的存储方式，在 `\application\config\queue.php` 这个配置文件中，添加消息队列对应的驱动配置
 
 ```php
    return [
@@ -241,11 +241,6 @@ namespace app\index\controller;
           return true;
       }
 
-      /**
-       * 根据消息中的数据进行实际的业务处理
-       * @param array|mixed    $data     发布任务时自定义的数据
-       * @return boolean                 任务执行的结果
-       */
       private function doHelloJob($data) {
   		// 根据消息中的数据进行实际的业务处理...
         
@@ -354,16 +349,16 @@ php think queue:work --queue helloJobQueue
   - listen 命令是 **双进程 + 管道** 的处理模式。
 
     listen命令所在的进程会循环地创建 **单次执行模式的 work 进程**，每次创建的 work 进程只消费一个消息就会结束, 然后 listen 进程再创建一个新的 work 进程，
-    - listen 进程会定时检查一次当前的 work 进程执行时间是否超过了 --timeout 参数的值, 如果已超时, 则 listen 进程会 kill 掉 work 进程, 然后抛出异常
+    - listen 进程会定时检查当前的 work 进程执行时间是否超过了 --timeout 参数的值, 如果已超时, 则 listen 进程会 kill 掉 work 进程, 然后抛出异常
     - listen 进程会通过管道来监听当前的 work 进程的输出, 当 work 进程有输出时, listen 进程会将输出写入到 stdout / stderr
-    - listen 进程会定时通过 `proc_get_status()` 来监控当前的 work 进程是否仍在运行, work 进程消费完任务之后, work 进程的状态会变成 terminated, 此时 listen 进程就会重新创建一个新的 work 进程, 然后定时检查新的 work 进程的执行时间是否超过了 --timeout 参数的值
+    - listen 进程会定时通过 `proc_get_status()` 来监控当前的 work 进程是否仍在运行, work 进程消费完一个任务之后, work 进程就结束了，其状态会变成 terminated, 此时 listen 进程就会重新创建一个新的 work 进程并对其计时, 新的 work 进程开始消费下一个任务
 
 - **2.3.2 结束时机不同**
 
   - work 命令的结束时机在上面的执行原理部分已叙述，此处不再重复
   - listen 命令中，listen 进程和 work 进程会在以下情况下结束：
-    - listen 进程会每秒检查一次当前的 work 进程的执行时间是否超过了 --timeout 参数的值，如果已超时, 此时 listen 进程会先 kill 掉当前的 work 进程, 然后抛出一个 `ProcessTimeoutException` 异常并结束 listen 进程
-    - listen 进程会定时检查一次自身使用的内存是否超过了 `--memory` 参数的值，如果已超过, 此时 listen 进程会直接 die 掉, work 进程也会自动结束.
+    - listen 进程会定时检查当前的 work 进程的执行时间是否超过了 --timeout 参数的值，如果已超时, 此时 listen 进程会先 kill 掉当前的 work 进程, 然后抛出一个 `ProcessTimeoutException` 异常并结束 listen 进程
+    - listen 进程会定时检查自身使用的内存是否超过了 `--memory` 参数的值，如果已超过, 此时 listen 进程会直接 die 掉, work 进程也会自动结束.
 
 - **2.3.3 性能不同**
 
@@ -924,11 +919,6 @@ TP5的消息队列与Laravel的消息队列比较相似，下面是与laravel �
 | 任务命令      | 无                                   | 展示失败任务列表，重试某个失败任务，删除某个失败任务              |
 | 支持的事件     | 失败回调事件                              | 失败回调事件，支持消费前事件，消费后事件                    |
 
-### 五 待讨论的问题
-
-#### 5.1 thinkphp-queue 中消息名称与消费者类名的绑定怎么实现？
-
-#### 5.1 消息中的业务数据的格式如何约定？
 
 
 
