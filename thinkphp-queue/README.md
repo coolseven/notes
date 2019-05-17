@@ -207,7 +207,7 @@ namespace app\index\controller;
       {
           // 有些消息在到达消费者时,可能已经不再需要执行了
           $isJobStillNeedToBeDone = $this->checkDatabaseToSeeIfJobNeedToBeDone($data);
-          if(!isJobStillNeedToBeDone){
+          if(!$isJobStillNeedToBeDone){
               $job->delete();
               return;
           }
@@ -241,9 +241,11 @@ namespace app\index\controller;
           return true;
       }
 
-      private function doHelloJob($data) {
-  		// 根据消息中的数据进行实际的业务处理...
-        
+      /**
+       * 根据消息中的数据进行实际的业务处理...
+       */
+      private function doHelloJob($data) 
+      {
           print("<info>Hello Job Started. job Data is: ".var_export($data,true)."</info> \n");
           print("<info>Hello Job is Fired at " . date('Y-m-d H:i:s') ."</info> \n");
           print("<info>Hello Job is Done!"."</info> \n");
